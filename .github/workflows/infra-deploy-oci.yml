@@ -1,0 +1,78 @@
+name: Provisionar OCI con Terraform y notificar IP
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra-deploy-oci.yml"
+
+jobs:
+  infra:
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_tenancy_ocid:     ${{ secrets.OCI_TENANCY_OCID }}
+      TF_VAR_user_ocid:        ${{ secrets.OCI_USER_OCID }}
+      TF_VAR_fingerprint:      ${{ secrets.OCI_FINGERPRINT }}
+      TF_VAR_private_key_pem:  ${{ secrets.OCI_API_PRIVATE_KEY }}
+      TF_VAR_region:           ${{ secrets.OCI_REGION }}
+      TF_VAR_compartment_ocid: ${{ secrets.OCI_COMPARTMENT_OCID }}
+      TF_VAR_ssh_public_key:   ${{ secrets.SSH_PUBLIC_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: 1.8.5 }
+
+      - name: Terraform Init
+        working-directory: infra
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: infra
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: infra
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        id: apply
+        working-directory: infra
+        run: terraform apply -auto-approve tfplan
+
+      - name: Capturar IP
+        id: ip
+        working-directory: infra
+        run: echo "PUBLIC_IP=$(terraform output -raw public_ip)" >> $GITHUB_ENV
+
+      - name: Enviar correo OK
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port:     ${{ secrets.SMTP_PORT }}
+          username:        ${{ secrets.SMTP_USERNAME }}
+          password:        ${{ secrets.SMTP_PASSWORD }}
+          to:              ${{ secrets.MAIL_TO }}
+          from:            ${{ secrets.MAIL_FROM }}
+          subject:         "✅ OCI listo - IP: ${{ env.PUBLIC_IP }}"
+          content_type:    text/html
+          body: >
+            <b>IP:</b> ${{ env.PUBLIC_IP }}<br>
+            Frontend: http://${{ env.PUBLIC_IP }}/<br>
+            Backend:  http://${{ env.PUBLIC_IP }}:3000/api/health
+
+      - name: Enviar correo FAIL
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port:     ${{ secrets.SMTP_PORT }}
+          username:        ${{ secrets.SMTP_USERNAME }}
+          password:        ${{ secrets.SMTP_PASSWORD }}
+          to:              ${{ secrets.MAIL_TO }}
+          from:            ${{ secrets.MAIL_FROM }}
+          subject:         "❌ Falló el provisionamiento OCI"
+          body:            "Revisa los logs del workflow."

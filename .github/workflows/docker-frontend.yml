@@ -1,0 +1,43 @@
+name: Frontend - Build & Push (Next.js standalone)
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "**/*.ts"
+      - "**/*.tsx"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "Dockerfile"
+      - ".github/workflows/docker-frontend.yml"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          # 👇 horneamos la URL del backend (ajusta la variable del repo)
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+          tags: |
+            ${{ secrets.DOCKER_USER }}/office-supply-frontend:latest
+            ${{ secrets.DOCKER_USER }}/office-supply-frontend:${{ github.sha }}
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USER }}/office-supply-frontend:latest
+          cache-to: type=inline

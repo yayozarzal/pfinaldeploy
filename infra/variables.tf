@@ -7,5 +7,12 @@ variable "compartment_ocid" { type = string }
 
 variable "ssh_public_key"   { type = string }
 
-variable "vm_count" { type = number, default = 1 }
-variable "instance_shape" { type = string, default = "VM.Standard.E2.1.Micro" }
+variable "vm_count" {
+  type    = number
+  default = 1
+}
+
+variable "instance_shape" {
+  type    = string
+  default = "VM.Standard.E2.1.Micro"
+}

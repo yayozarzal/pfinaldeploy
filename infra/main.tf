@@ -50,24 +50,32 @@ resource "oci_core_security_list" "sl" {
   ingress_security_rules {
     protocol = "6"
     source   = "0.0.0.0/0"
-    tcp_options { min = 22, max = 22 }
+    tcp_options {
+      min = 22
+      max = 22
+    }
   }
 
   # HTTP 80
   ingress_security_rules {
     protocol = "6"
     source   = "0.0.0.0/0"
-    tcp_options { min = 80, max = 80 }
+    tcp_options {
+      min = 80
+      max = 80
+    }
   }
 
-  # API 3000 (pruebas)
+  # API 3000 (solo para pruebas)
   ingress_security_rules {
     protocol = "6"
     source   = "0.0.0.0/0"
-    tcp_options { min = 3000, max = 3000 }
+    tcp_options {
+      min = 3000
+      max = 3000
+    }
   }
 }
-
 resource "oci_core_subnet" "subnet" {
   cidr_block                 = "10.10.1.0/24"
   compartment_id             = var.compartment_ocid

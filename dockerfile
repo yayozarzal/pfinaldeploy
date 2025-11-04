@@ -5,19 +5,11 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Habilitar pnpm (Corepack viene en Node 18+)
-RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+# Copiamos manifests de npm
+COPY package*.json ./
 
-# Dependencias de compilación (sharp/next-opt)
-RUN apk add --no-cache libc6-compat
-
-# Copiar manifests primero para cache
-COPY package.json pnpm-lock.yaml ./
-# Si usas .npmrc o .pnpmfile.cjs, cópialos también
-# COPY .npmrc ./
-
-# Instalar deps (prod+dev para build)
-RUN pnpm install --frozen-lockfile
+# Instalar deps (prod+dev) para el build
+RUN npm ci
 
 # Copiar el resto del código
 COPY . .
@@ -25,8 +17,12 @@ COPY . .
 # Desactivar telemetría de Next
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Construir en modo standalone
-RUN pnpm build
+# Hornear la URL del backend en build
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+# Build standalone
+RUN npm run build
 
 # -----------------------------
 # Etapa 2: Runtime mínimo
@@ -37,19 +33,17 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Para imágenes/optimizadores nativos
+# También dejamos disponible la variable en runtime (por si la usas)
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+# Dependencias para next/image / libc
 RUN apk add --no-cache libc6-compat
 
 # Copiar salida standalone
-# (Next genera server.js y node_modules necesarios en .next/standalone)
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static      ./.next/static
 COPY --from=builder /app/public            ./public
 
-# Si usas Tailwind o fuentes en /public, ya están copiadas
-
-# Puerto por defecto
 EXPOSE 3000
-
-# Iniciar el servidor Next.js standalone
-CMD ["node", "server.js"]
+CMD ["node","server.js"]

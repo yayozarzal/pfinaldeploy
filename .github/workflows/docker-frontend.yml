@@ -1,23 +1,34 @@
 name: Frontend - Build & Push (Next.js standalone)
 
 on:
+  workflow_dispatch:            # 👈 permite "Run workflow" manual
   push:
     branches: [ "main" ]
     paths:
       - "**/*.ts"
       - "**/*.tsx"
       - "package.json"
-      - "pnpm-lock.yaml"
+      - "package-lock.json"     # 👈 usa npm; quita pnpm-lock.yaml
       - "Dockerfile"
       - ".github/workflows/docker-frontend.yml"
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # 👇 sanity check: asegúrate de que la variable está seteada
+      - name: Echo API URL
+        run: echo "NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}"
+
+      - name: Fail if NEXT_PUBLIC_API_URL is empty
+        run: |
+          if [ -z "${{ vars.NEXT_PUBLIC_API_URL }}" ]; then
+            echo "ERROR: Repo variable NEXT_PUBLIC_API_URL is empty."
+            exit 1
+          fi
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -33,7 +44,6 @@ jobs:
         with:
           context: .
           push: true
-          # 👇 horneamos la URL del backend (ajusta la variable del repo)
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
           tags: |
